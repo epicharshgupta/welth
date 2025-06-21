@@ -1,3 +1,37 @@
+# Welth — AI-Powered Financial Management System
+
+## 🎯 Core Objective  
+Welth helps users **track, analyze, and optimize** their finances through AI-driven insights, spending forecasts, and budgeting assistance.
+
+## 🛠 Tech Stack  
+- **Frontend**: React 19 + Next.js (RSC & SSR for fast and dynamic UI)  
+- **Database & Auth**: Supabase (PostgreSQL) with Prisma ORM  
+- **Background Jobs**: Inngest for periodic sync, report generation, AI tasks  
+- **Security & Edge**: Arcjet for API protection (rate limiting, bot filtering)  
+- **AI Engine**: Generative AI via OpenAI (or equivalent) for personalized reports  
+
+## ⚙️ Key Features  
+1. 🔍 **Expense Tracking**: Category-based transaction logging  
+2. 📊 **Budgeting**: Alerts, predictions, and trends analysis  
+3. 🤖 **AI Insights**: Auto-generated tips like “reduce dining out”  
+4. 📅 **Scheduled Reports**: Weekly/monthly email summaries via Inngest  
+5. 🔐 **Secure API Endpoints**: Protected with Arcjet middleware  
+
+## 🏗 Architecture Diagram  
+(Following section offers diagram & explanation)
+
+## 🚀 Getting Started  
+1. Clone repo  
+2. `npm install`  
+3. Set `.env` variables: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, DATABASE_URL, INNGEST_TOKEN, ARCJET_SECRET  
+4. `npx prisma migrate dev` & `npx prisma generate`  
+5. Run background jobs: Inngest worker  
+6. `npm run dev` (Vercel Tutorial ready in `/vercel.json`)
+
+## ✅ Production Setup  
+Deployed on Vercel; uses Vercel Edge (RSC) + Supabase Edge Functions + Inngest cloud for scheduling.  
+Arcjet edge middleware protects API routes.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
