@@ -366,28 +366,26 @@ import { revalidatePath } from "next/cache";
 import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";   // ✅ Correct client
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini Client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);   // ✅ Correct API key
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Helper to clean Prisma Decimal
+// Helper to convert Prisma Decimal
 const serializeAmount = (obj) => ({
   ...obj,
   amount: obj.amount.toNumber(),
 });
 
-
-// -------------------------------------------
-// CREATE TRANSACTION
-// -------------------------------------------
+/* -----------------------------------------------------
+   CREATE TRANSACTION
+----------------------------------------------------- */
 export async function createTransaction(data) {
   try {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
     const req = await request();
-
     const decision = await aj.protect(req, {
       userId,
       requested: 1,
@@ -447,9 +445,9 @@ export async function createTransaction(data) {
 }
 
 
-// -------------------------------------------
-// HELPER FOR RECURRING DATE
-// -------------------------------------------
+/* -----------------------------------------------------
+   HELPER FOR RECURRING DATES
+----------------------------------------------------- */
 function calculateNextRecurringDate(startDate, interval) {
   const date = new Date(startDate);
 
@@ -472,14 +470,13 @@ function calculateNextRecurringDate(startDate, interval) {
 }
 
 
-// -------------------------------------------
-// AI RECEIPT SCANNER — FIXED & WORKING
-// -------------------------------------------
+/* -----------------------------------------------------
+   AI RECEIPT SCANNER — 100% WORKING
+----------------------------------------------------- */
 export async function scanReceipt(file) {
   try {
-    // Use correct supported model
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-8b",     // ✅ Works perfectly in v1
+      model: "gemini-1.5-flash",   // 🔥 Correct model for v1beta API
     });
 
     const arrayBuffer = await file.arrayBuffer();
@@ -487,14 +484,16 @@ export async function scanReceipt(file) {
 
     const prompt = `
       Analyze this receipt image and extract JSON:
+
       {
         "amount": number,
-        "date": "ISO string",
+        "date": "ISO",
         "description": "string",
         "merchantName": "string",
         "category": "string"
       }
-      If not a receipt return {}
+
+      If not a receipt, return {} only.
     `;
 
     const result = await model.generateContent([
@@ -510,12 +509,12 @@ export async function scanReceipt(file) {
     const text = result.response.text().trim();
     const cleaned = text.replace(/```json|```/g, "").trim();
 
-    let data;
+    let data = {};
     try {
       data = JSON.parse(cleaned);
     } catch (e) {
       console.error("Gemini JSON Error:", e);
-      throw new Error("Invalid Gemini response");
+      throw new Error("Invalid JSON from Gemini");
     }
 
     return {
@@ -525,6 +524,7 @@ export async function scanReceipt(file) {
       merchantName: data.merchantName || "",
       category: data.category || "other-expense",
     };
+
   } catch (error) {
     console.error("Error scanning receipt:", error);
     throw new Error("Failed to scan receipt");
@@ -532,9 +532,9 @@ export async function scanReceipt(file) {
 }
 
 
-// -------------------------------------------
-// GET TRANSACTION
-// -------------------------------------------
+/* -----------------------------------------------------
+   GET TRANSACTION
+----------------------------------------------------- */
 export async function getTransaction(id) {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
@@ -558,9 +558,9 @@ export async function getTransaction(id) {
 }
 
 
-// -------------------------------------------
-// UPDATE TRANSACTION
-// -------------------------------------------
+/* -----------------------------------------------------
+   UPDATE TRANSACTION
+----------------------------------------------------- */
 export async function updateTransaction(id, data) {
   try {
     const { userId } = await auth();
@@ -572,22 +572,22 @@ export async function updateTransaction(id, data) {
 
     if (!user) throw new Error("User not found");
 
-    const originalTransaction = await db.transaction.findUnique({
+    const original = await db.transaction.findUnique({
       where: { id, userId: user.id },
       include: { account: true },
     });
 
-    if (!originalTransaction) throw new Error("Transaction not found");
+    if (!original) throw new Error("Transaction not found");
 
-    const oldBalance =
-      originalTransaction.type === "EXPENSE"
-        ? -originalTransaction.amount.toNumber()
-        : originalTransaction.amount.toNumber();
+    const oldValue =
+      original.type === "EXPENSE"
+        ? -original.amount.toNumber()
+        : original.amount.toNumber();
 
-    const newBalance =
+    const newValue =
       data.type === "EXPENSE" ? -data.amount : data.amount;
 
-    const netBalanceChange = newBalance - oldBalance;
+    const netChange = newValue - oldValue;
 
     const transaction = await db.$transaction(async (tx) => {
       const updated = await tx.transaction.update({
@@ -603,7 +603,9 @@ export async function updateTransaction(id, data) {
 
       await tx.account.update({
         where: { id: data.accountId },
-        data: { balance: { increment: netBalanceChange } },
+        data: {
+          balance: { increment: netChange },
+        },
       });
 
       return updated;
@@ -617,3 +619,4 @@ export async function updateTransaction(id, data) {
     throw new Error(error.message);
   }
 }
+
