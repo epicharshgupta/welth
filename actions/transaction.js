@@ -8,7 +8,7 @@ import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
 
 // import { GoogleGenerativeAI } from "@google/generative-ai";
-import { GoogleAIClient } from "@google/generative-ai";
+// import { GoogleAIClient } from "@google/generative-ai";
 
 // const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // const genAI = new GoogleAIClient({ apiKey: process.env.GOOGLE_API_KEY });
