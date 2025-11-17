@@ -366,17 +366,17 @@ import { revalidatePath } from "next/cache";
 import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
 
-import { GoogleAIClient } from "@google/generative-ai";   // ✅ Correct client
+import { GoogleGenerativeAI } from "@google/generative-ai";   // ✅ Correct client
 
 // Initialize Gemini Client
-const genAI = new GoogleAIClient({
-  apiKey: process.env.GEMINI_API_KEY,   // ✅ Correct env variable
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);   // ✅ Correct API key
 
+// Helper to clean Prisma Decimal
 const serializeAmount = (obj) => ({
   ...obj,
   amount: obj.amount.toNumber(),
 });
+
 
 // -------------------------------------------
 // CREATE TRANSACTION
@@ -394,7 +394,7 @@ export async function createTransaction(data) {
     });
 
     if (decision.isDenied()) {
-      throw new Error("Too many requests. Try later.");
+      throw new Error("Too many requests. Try again later.");
     }
 
     const user = await db.user.findUnique({
@@ -446,7 +446,10 @@ export async function createTransaction(data) {
   }
 }
 
-// Recurring date helper
+
+// -------------------------------------------
+// HELPER FOR RECURRING DATE
+// -------------------------------------------
 function calculateNextRecurringDate(startDate, interval) {
   const date = new Date(startDate);
 
@@ -468,21 +471,22 @@ function calculateNextRecurringDate(startDate, interval) {
   return date;
 }
 
+
 // -------------------------------------------
-// SCAN RECEIPT (AI)
+// AI RECEIPT SCANNER — FIXED & WORKING
 // -------------------------------------------
 export async function scanReceipt(file) {
   try {
+    // Use correct supported model
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-8b",   // ✅ Modern, working model
+      model: "gemini-1.5-flash-8b",     // ✅ Works perfectly in v1
     });
 
-    // Convert File → Base64
     const arrayBuffer = await file.arrayBuffer();
     const base64String = Buffer.from(arrayBuffer).toString("base64");
 
     const prompt = `
-      Analyze this receipt image and extract the following info in JSON:
+      Analyze this receipt image and extract JSON:
       {
         "amount": number,
         "date": "ISO string",
@@ -490,7 +494,7 @@ export async function scanReceipt(file) {
         "merchantName": "string",
         "category": "string"
       }
-      If not a receipt, return {}
+      If not a receipt return {}
     `;
 
     const result = await model.generateContent([
@@ -504,28 +508,29 @@ export async function scanReceipt(file) {
     ]);
 
     const text = result.response.text().trim();
-    const cleanedText = text.replace(/```json|```/g, "").trim();
+    const cleaned = text.replace(/```json|```/g, "").trim();
 
     let data;
     try {
-      data = JSON.parse(cleanedText);
-    } catch (err) {
-      console.error("JSON Error:", err);
-      throw new Error("Invalid JSON from Gemini");
+      data = JSON.parse(cleaned);
+    } catch (e) {
+      console.error("Gemini JSON Error:", e);
+      throw new Error("Invalid Gemini response");
     }
 
     return {
       amount: parseFloat(data.amount) || 0,
-      date: data.date ? new Date(data.date) : new Date(),
+      date: data.date ? new Date(data.date) : null,
       description: data.description || "",
-      category: data.category || "other-expense",
       merchantName: data.merchantName || "",
+      category: data.category || "other-expense",
     };
   } catch (error) {
     console.error("Error scanning receipt:", error);
     throw new Error("Failed to scan receipt");
   }
 }
+
 
 // -------------------------------------------
 // GET TRANSACTION
@@ -551,6 +556,7 @@ export async function getTransaction(id) {
 
   return serializeAmount(transaction);
 }
+
 
 // -------------------------------------------
 // UPDATE TRANSACTION
